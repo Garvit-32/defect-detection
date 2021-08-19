@@ -24,11 +24,11 @@
 
 storage.googleapis.com
 runs/*
-data/*
-!data/hyps/*
-!data/images/zidane.jpg
-!data/images/bus.jpg
-!data/*.sh
+# data/*
+# !data/hyps/*
+# !data/images/zidane.jpg
+# !data/images/bus.jpg
+# !data/*.sh
 
 results*.csv
 
@@ -251,6 +251,7 @@ data1/
 Images/
 main_data/
 runs/
+yolov5m.pt
 yolov5m.pt
 wandb/
 .github
