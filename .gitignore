@@ -44,7 +44,7 @@ VOC/
 
 # Neural Network weights -----------------------------------------------------------------------------------------------
 *.weights
-*.pt
+.pt
 *.onnx
 *.mlmodel
 *.torchscript
@@ -254,3 +254,4 @@ runs/
 yolov5m.pt
 wandb/
 .github
+!best.pt

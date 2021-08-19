@@ -100,5 +100,10 @@ if __name__ == "__main__":
     pool.starmap(process, task_list, chunksize=1)
     pool.close()
     pool.join()
-   # python train.py --project defect --batch-size 8 --img 1000 --data data/defect.yaml --weights yolov5x.pt --hyp data/hyp.plate.yaml --epochs 100
-    # python train.py --img 640 --batch 2 --epochs 3 --data data/defect.yaml --weights yolov5m.pt --project defect
+    # python train.py --project defect --batch-size 8 --img 1000 --data data/defect.yaml --weights yolov5x.pt --hyp data/hyp.plate.yaml --epochs 100
+    # python train.py --img 320 --batch 2 --epochs 3 --data data/defect.yaml --weights yolov5m.pt --project defect --name test
+
+    # python train.py --img 1024 --batch 60 --epochs 500 --data data/defect.yaml --weights yolov5m.pt --project defect1024randomcrop --name test
+
+    # python val.py --img 1024 --batch 60 --data data/defect.yaml --weights best.pt --conf-thres 0.01 --iou-thres 0.6
+    # python val.py --img 1024 --batch 60 --data data/defect.yaml --weights onlydefect500/best.pt --conf-thres 0.001 --iou-thres 0.5 --project onlydefect500 --name validation --single-cls --verbose --save-hybrid
