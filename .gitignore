@@ -256,3 +256,4 @@ yolov5m.pt
 wandb/
 .github
 !best.pt
+debug.py
