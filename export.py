@@ -197,35 +197,6 @@ def parse_opt():
     return opt
 
 
-def parse_opt():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str,
-                        default='./yolov5s.pt', help='weights path')
-    parser.add_argument('--img-size', nargs='+', type=int,
-                        default=[640, 640], help='image (height, width)')
-    parser.add_argument('--batch-size', type=int, default=1, help='batch size')
-    parser.add_argument('--device', default='cpu',
-                        help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--include', nargs='+',
-                        default=['torchscript', 'onnx', 'coreml'], help='include formats')
-    parser.add_argument('--half', action='store_true',
-                        help='FP16 half-precision export')
-    parser.add_argument('--inplace', action='store_true',
-                        help='set YOLOv5 Detect() inplace=True')
-    parser.add_argument('--train', action='store_true',
-                        help='model.train() mode')
-    parser.add_argument('--optimize', action='store_true',
-                        help='TorchScript: optimize for mobile')
-    parser.add_argument('--dynamic', action='store_true',
-                        help='ONNX: dynamic axes')
-    parser.add_argument('--simplify', action='store_true',
-                        help='ONNX: simplify model')
-    parser.add_argument('--opset', type=int, default=12,
-                        help='ONNX: opset version')
-    opt = parser.parse_args()
-    return opt
-
-
 def main(opt):
     set_logging()
     print(colorstr('export: ') +
