@@ -4,6 +4,12 @@ Usage:
     $ python path/to/export.py --weights yolov5s.pt --img 640 --batch 1
 """
 
+from utils.torch_utils import select_device
+from utils.general import colorstr, check_img_size, check_requirements, file_size, set_logging
+from utils.activations import Hardswish, SiLU
+from models.experimental import attempt_load
+from models.yolo import Detect
+from models.common import Conv
 import argparse
 import sys
 import time
@@ -15,13 +21,6 @@ from torch.utils.mobile_optimizer import optimize_for_mobile
 
 FILE = Path(__file__).absolute()
 sys.path.append(FILE.parents[0].as_posix())  # add yolov5/ to path
-
-from models.common import Conv
-from models.yolo import Detect
-from models.experimental import attempt_load
-from utils.activations import Hardswish, SiLU
-from utils.general import colorstr, check_img_size, check_requirements, file_size, set_logging
-from utils.torch_utils import select_device
 
 
 def export_torchscript(model, img, file, optimize):
@@ -53,7 +52,8 @@ def export_onnx(model, img, file, opset, train, dynamic, simplify):
                           input_names=['images'],
                           output_names=['output'],
                           dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},  # shape(1,3,640,640)
-                                        'output': {0: 'batch', 1: 'anchors'}  # shape(1,25200,85)
+                                        # shape(1,25200,85)
+                                        'output': {0: 'batch', 1: 'anchors'}
                                         } if dynamic else None)
 
         # Checks
@@ -66,7 +66,8 @@ def export_onnx(model, img, file, opset, train, dynamic, simplify):
             try:
                 import onnxsim
 
-                print(f'{prefix} simplifying with onnx-simplifier {onnxsim.__version__}...')
+                print(
+                    f'{prefix} simplifying with onnx-simplifier {onnxsim.__version__}...')
                 model_onnx, check = onnxsim.simplify(
                     model_onnx,
                     dynamic_input_shape=dynamic,
@@ -76,7 +77,8 @@ def export_onnx(model, img, file, opset, train, dynamic, simplify):
             except Exception as e:
                 print(f'{prefix} simplifier failure: {e}')
         print(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
-        print(f"{prefix} run --dynamic ONNX model inference with: 'python detect.py --weights {f}'")
+        print(
+            f"{prefix} run --dynamic ONNX model inference with: 'python detect.py --weights {f}'")
     except Exception as e:
         print(f'{prefix} export failure: {e}')
 
@@ -91,7 +93,8 @@ def export_coreml(model, img, file):
         f = file.with_suffix('.mlmodel')
         model.train()  # CoreML exports should be placed in model.train() mode
         ts = torch.jit.trace(model, img, strict=False)  # TorchScript model
-        model = ct.convert(ts, inputs=[ct.ImageType('image', shape=img.shape, scale=1 / 255.0, bias=[0, 0, 0])])
+        model = ct.convert(ts, inputs=[ct.ImageType(
+            'image', shape=img.shape, scale=1 / 255.0, bias=[0, 0, 0])])
         model.save(f)
         print(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
     except Exception as e:
@@ -118,19 +121,23 @@ def run(weights='./yolov5s.pt',  # weights path
 
     # Load PyTorch model
     device = select_device(device)
-    assert not (device.type == 'cpu' and half), '--half only compatible with GPU export, i.e. use --device 0'
+    assert not (
+        device.type == 'cpu' and half), '--half only compatible with GPU export, i.e. use --device 0'
     model = attempt_load(weights, map_location=device)  # load FP32 model
     names = model.names
 
     # Input
     gs = int(max(model.stride))  # grid size (max stride)
-    img_size = [check_img_size(x, gs) for x in img_size]  # verify img_size are gs-multiples
-    img = torch.zeros(batch_size, 3, *img_size).to(device)  # image size(1,3,320,192) iDetection
+    # verify img_size are gs-multiples
+    img_size = [check_img_size(x, gs) for x in img_size]
+    # image size(1,3,320,192) iDetection
+    img = torch.zeros(batch_size, 3, *img_size).to(device)
 
     # Update model
     if half:
         img, model = img.half(), model.half()  # to FP16
-    model.train() if train else model.eval()  # training mode = no Detect() layer grid construction
+    # training mode = no Detect() layer grid construction
+    model.train() if train else model.eval()
     for k, m in model.named_modules():
         if isinstance(m, Conv):  # assign export-friendly activations
             if isinstance(m.act, nn.Hardswish):
@@ -144,7 +151,8 @@ def run(weights='./yolov5s.pt',  # weights path
 
     for _ in range(2):
         y = model(img)  # dry runs
-    print(f"\n{colorstr('PyTorch:')} starting from {weights} ({file_size(weights):.1f} MB)")
+    print(
+        f"\n{colorstr('PyTorch:')} starting from {weights} ({file_size(weights):.1f} MB)")
 
     # Exports
     if 'torchscript' in include:
@@ -162,25 +170,66 @@ def run(weights='./yolov5s.pt',  # weights path
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='./yolov5s.pt', help='weights path')
-    parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='image (height, width)')
+    parser.add_argument('--weights', type=str,
+                        default='./yolov5s.pt', help='weights path')
+    parser.add_argument('--img-size', nargs='+', type=int,
+                        default=[640, 640], help='image (height, width)')
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
-    parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--include', nargs='+', default=['torchscript', 'onnx', 'coreml'], help='include formats')
-    parser.add_argument('--half', action='store_true', help='FP16 half-precision export')
-    parser.add_argument('--inplace', action='store_true', help='set YOLOv5 Detect() inplace=True')
-    parser.add_argument('--train', action='store_true', help='model.train() mode')
-    parser.add_argument('--optimize', action='store_true', help='TorchScript: optimize for mobile')
-    parser.add_argument('--dynamic', action='store_true', help='ONNX: dynamic axes')
-    parser.add_argument('--simplify', action='store_true', help='ONNX: simplify model')
-    parser.add_argument('--opset', type=int, default=12, help='ONNX: opset version')
+    parser.add_argument('--device', default='cpu',
+                        help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--include', nargs='+',
+                        default=['torchscript', 'onnx', 'coreml'], help='include formats')
+    parser.add_argument('--half', action='store_true',
+                        help='FP16 half-precision export')
+    parser.add_argument('--inplace', action='store_true',
+                        help='set YOLOv5 Detect() inplace=True')
+    parser.add_argument('--train', action='store_true',
+                        help='model.train() mode')
+    parser.add_argument('--optimize', action='store_true',
+                        help='TorchScript: optimize for mobile')
+    parser.add_argument('--dynamic', action='store_true',
+                        help='ONNX: dynamic axes')
+    parser.add_argument('--simplify', action='store_true',
+                        help='ONNX: simplify model')
+    parser.add_argument('--opset', type=int, default=12,
+                        help='ONNX: opset version')
+    opt = parser.parse_args()
+    return opt
+
+
+def parse_opt():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--weights', type=str,
+                        default='./yolov5s.pt', help='weights path')
+    parser.add_argument('--img-size', nargs='+', type=int,
+                        default=[640, 640], help='image (height, width)')
+    parser.add_argument('--batch-size', type=int, default=1, help='batch size')
+    parser.add_argument('--device', default='cpu',
+                        help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--include', nargs='+',
+                        default=['torchscript', 'onnx', 'coreml'], help='include formats')
+    parser.add_argument('--half', action='store_true',
+                        help='FP16 half-precision export')
+    parser.add_argument('--inplace', action='store_true',
+                        help='set YOLOv5 Detect() inplace=True')
+    parser.add_argument('--train', action='store_true',
+                        help='model.train() mode')
+    parser.add_argument('--optimize', action='store_true',
+                        help='TorchScript: optimize for mobile')
+    parser.add_argument('--dynamic', action='store_true',
+                        help='ONNX: dynamic axes')
+    parser.add_argument('--simplify', action='store_true',
+                        help='ONNX: simplify model')
+    parser.add_argument('--opset', type=int, default=12,
+                        help='ONNX: opset version')
     opt = parser.parse_args()
     return opt
 
 
 def main(opt):
     set_logging()
-    print(colorstr('export: ') + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
+    print(colorstr('export: ') +
+          ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
     run(**vars(opt))
 
 
